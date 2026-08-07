@@ -1,0 +1,9 @@
+{
+  "name": "aeda/dia-del-nino",
+  "description": "Formulario de inscripcion al evento del Dia del Nino",
+  "require": {
+    "php": ">=8.1",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*"
+  }
+}

@@ -1,0 +1,13 @@
+# La configuración local lleva la contraseña de la base y la del SMTP.
+config.local.php
+
+# El padrón son datos personales de 4.000 personas: se carga a mano en la
+# base y no viaja al repositorio.
+sql/padron_*.sql
+
+# Diagnóstico de correo: expone la configuración SMTP y permite mandar
+# mails a cualquier dirección. Sólo para probar en local.
+probar_mail.php
+
+vendor/
+composer.lock

@@ -1,0 +1,43 @@
+<?php
+/**
+ * Plantilla de configuración local.
+ *
+ * Copiala como `config.local.php` y completá los valores. Ese archivo está
+ * en el .gitignore y NO se sube: las credenciales no tienen por qué viajar
+ * al repositorio. En Railway nada de esto se usa, los valores vienen por
+ * variables de entorno.
+ *
+ * OJO: no completes este archivo. Completá la copia.
+ */
+
+return [
+    'MYSQLHOST'     => 'localhost',
+    'MYSQLPORT'     => '3306',
+    'MYSQLUSER'     => 'root',
+    'MYSQLPASSWORD' => '',
+    'MYSQLDATABASE' => 'sindicato',
+
+    'FECHA_EVENTO'  => '2026-09-19',
+    'HORA_EVENTO'   => 'de 10 a 18:30 hs',
+    'LUGAR_EVENTO'  => 'Predio SITTAN — Av. España 2500, CABA',
+    'EDAD_TOPE'     => '16',
+
+    // Clave para entrar a listado.php
+    'TOKEN_LISTADO' => '',
+
+    // Muestra el error real en pantalla en vez del mensaje genérico.
+    // Sólo para probar en local; en Railway NO se define.
+    'DEBUG'         => '1',
+
+    // ── Mail de confirmación ────────────────────────────────────────────
+    // Mientras estén vacíos no se manda nada y el formulario anda igual.
+    // Con Gmail o Google Workspace hay que generar una "contraseña de
+    // aplicación": la clave normal de la cuenta no sirve.
+    'SMTP_HOST'     => 'smtp.gmail.com',
+    'SMTP_PORT'     => '465',         // 465 con SSL, o 587 con STARTTLS
+    'SMTP_USER'     => '',            // la casilla que envía, con @
+    'SMTP_PASS'     => '',            // contraseña de aplicación, sin espacios
+    'SMTP_DESDE'    => '',            // por defecto, igual que SMTP_USER
+    'SMTP_NOMBRE'   => 'AEDA',
+    'SMTP_COPIA'    => '',            // copia oculta al organizador
+];
