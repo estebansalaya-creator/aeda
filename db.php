@@ -59,10 +59,16 @@ function conexion(): PDO
     return $pdo;
 }
 
-/** Fecha con la que se calcula la edad de los chicos. */
+/**
+ * Fecha del evento. Con ella se calcula la edad de los chicos, así que un
+ * valor equivocado deja gente afuera o de más.
+ *
+ * El valor por omisión es la fecha real del festejo, para que la aplicación
+ * muestre algo correcto aunque falte definir la variable en el entorno.
+ */
 function fechaCorte(): string
 {
-    return getenv('FECHA_EVENTO') ?: '2026-08-16';
+    return getenv('FECHA_EVENTO') ?: '2026-09-19';
 }
 
 /** Edad tope, sin incluir: 16 significa "hasta 15 años cumplidos". */
