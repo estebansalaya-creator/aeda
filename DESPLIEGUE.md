@@ -59,12 +59,43 @@ git push -u origin main
    SMTP_PASS      (la contraseña de aplicación, sin espacios)
    SMTP_NOMBRE    AEDA
    SMTP_COPIA     (opcional, copia oculta al organizador)
+   REPORTE_PARA   (destinatarios del reporte diario, separados por coma)
    ```
 
    **`DEBUG` no se define.** Si está, los errores de base se muestran al
    público.
 
 5. En **Settings → Networking → Generate Domain** sale la URL pública.
+
+## 3 bis. El reporte diario por mail
+
+La planilla diaria la manda `reporte.php`. En Railway se resuelve con un
+**segundo servicio**, apuntando al mismo repositorio, que en vez de quedar
+escuchando corre el script y termina.
+
+1. **New → GitHub Repo** y elegí el mismo repositorio. Nombralo `reporte`
+   para no confundirlo con la aplicación web.
+2. En **Settings → Deploy**:
+   - **Custom Start Command**: `php reporte.php`
+   - **Cron Schedule**: `0 9 * * *`
+   - **Serverless / Sleep**: activado, así entre corrida y corrida no consume.
+3. En **Variables**, las mismas que la aplicación (conviene usar
+   `${{nombre-del-servicio-web.VARIABLE}}` para no cargarlas dos veces) más:
+
+   ```
+   REPORTE_PARA    quien.recibe@aeda.com.ar, otro@aeda.com.ar
+   REPORTE_ASUNTO  Inscripciones Día de la Niñez     (opcional)
+   ```
+
+   El servicio necesita sí o sí `MYSQL_URL` y todas las `SMTP_*`.
+
+**El cron de Railway va en UTC.** Argentina está tres horas atrás, así que
+`0 9 * * *` es **6 de la mañana** acá. Para que llegue a las 8, poné
+`0 11 * * *`.
+
+Antes de esperar al cron, probá el envío entrando a
+`https://LA-URL/reporte.php?t=EL_TOKEN`: contesta en texto plano si mandó el
+mail o qué falló.
 
 ## 4. Cargar el padrón en la base de Railway
 
@@ -84,6 +115,8 @@ sql/01_inscripciones.sql
 - Probá con el documento **38530847** (5 chicos): tiene que dejarte inscribir.
 - Revisá el listado en `https://LA-URL/listado.php?t=EL_TOKEN`.
 - Verificá que llegue el mail de confirmación.
+- Dispará el reporte a mano en `https://LA-URL/reporte.php?t=EL_TOKEN` y
+  fijate que llegue la planilla adjunta.
 
 ## Cuando cambie el padrón
 

@@ -111,58 +111,113 @@ function smtpCmd($sock, ?string $linea, array $esperado): string
     return $resp;
 }
 
-function enviarConfirmacion(array $datos): bool
+/**
+ * Envía un mail por SMTP. Es la única función que habla con el servidor:
+ * la confirmación de la inscripción y el reporte diario pasan por acá.
+ *
+ * Opciones:
+ *   para      string o lista de direcciones
+ *   asunto    string
+ *   texto     cuerpo en texto plano
+ *   html      cuerpo en HTML (opcional)
+ *   copia     dirección en copia oculta (opcional; por omisión SMTP_COPIA)
+ *   adjuntos  lista de ['nombre' => ..., 'tipo' => ..., 'datos' => binario]
+ *
+ * Devuelve false y deja el motivo en el log si algo falla: quien llama
+ * decide si eso es grave o no.
+ */
+function enviarMail(array $o): bool
 {
     $host = getenv('SMTP_HOST');
     $user = getenv('SMTP_USER');
     $pass = getenv('SMTP_PASS');
 
     if (!$host || !$user || !$pass) {
-        return false;   // sin configurar: el formulario anda igual
+        return false;   // sin configurar: el resto de la aplicación anda igual
     }
 
-    $puerto  = (int) (getenv('SMTP_PORT') ?: 587);
-    $desde   = getenv('SMTP_DESDE') ?: $user;
-    $nombre  = getenv('SMTP_NOMBRE') ?: 'AEDA';
-    $copia   = getenv('SMTP_COPIA') ?: '';       // opcional, para el organizador
-    $para    = $datos['email'];
+    $puerto = (int) (getenv('SMTP_PORT') ?: 587);
+    $desde  = getenv('SMTP_DESDE') ?: $user;
+    $nombre = getenv('SMTP_NOMBRE') ?: 'AEDA';
+    $copia  = $o['copia'] ?? (getenv('SMTP_COPIA') ?: '');
 
-    if (!$para || !filter_var($para, FILTER_VALIDATE_EMAIL)) {
+    $valida = fn($d) => (bool) filter_var($d, FILTER_VALIDATE_EMAIL);
+
+    $para = array_values(array_filter((array) ($o['para'] ?? []), $valida));
+    if (!$para) {
+        error_log('smtp: no hay destinatario válido');
         return false;
     }
 
-    $cuerpo = armarCuerpo($datos, $nombre);
+    // La copia se valida aparte: un typo en SMTP_COPIA haría que el servidor
+    // rechace el RCPT TO y se perdería también el mail del destinatario.
+    $copia = $valida($copia) ? $copia : '';
 
-    $limite   = '=_' . bin2hex(random_bytes(12));
+    $adjuntos = $o['adjuntos'] ?? [];
+    $html     = $o['html'] ?? '';
+    $texto    = $o['texto'] ?? '';
+
+    // Dos niveles de MIME cuando hay adjuntos: afuera un mixed que lleva el
+    // mensaje y los archivos, adentro un alternative con texto y HTML. Los
+    // clientes que no entienden HTML siguen mostrando algo legible.
+    $limAlt = '=_alt_' . bin2hex(random_bytes(10));
+    $limMix = '=_mix_' . bin2hex(random_bytes(10));
+
+    $alternativo = "--$limAlt\r\n"
+                 . "Content-Type: text/plain; charset=UTF-8\r\n"
+                 . "Content-Transfer-Encoding: base64\r\n\r\n"
+                 . chunk_split(base64_encode($texto)) . "\r\n";
+    if ($html !== '') {
+        $alternativo .= "--$limAlt\r\n"
+                      . "Content-Type: text/html; charset=UTF-8\r\n"
+                      . "Content-Transfer-Encoding: base64\r\n\r\n"
+                      . chunk_split(base64_encode($html)) . "\r\n";
+    }
+    $alternativo .= "--$limAlt--\r\n";
+
     $cabecera = [
         'Date: ' . date('r'),
         'From: ' . cabeceraMime($nombre) . " <$desde>",
-        "To: <$para>",
-        'Subject: ' . cabeceraMime('Inscripción confirmada — Día de la Niñez'),
+        'To: ' . implode(', ', array_map(fn($d) => "<$d>", $para)),
+        'Subject: ' . cabeceraMime((string) ($o['asunto'] ?? '')),
         'MIME-Version: 1.0',
-        "Content-Type: multipart/alternative; boundary=\"$limite\"",
         'Message-ID: <' . bin2hex(random_bytes(12)) . "@$host>",
     ];
-    if ($copia) {
-        $cabecera[] = "Bcc: <$copia>";
+
+    // La copia oculta NO lleva cabecera: si se escribiera un "Bcc:" acá
+    // viajaría dentro del mensaje y dejaría de ser oculta. Que la reciba
+    // alcanza con nombrarla en el RCPT TO, más abajo.
+
+    if ($adjuntos) {
+        $cabecera[] = "Content-Type: multipart/mixed; boundary=\"$limMix\"";
+        $cuerpo = "--$limMix\r\n"
+                . "Content-Type: multipart/alternative; boundary=\"$limAlt\"\r\n\r\n"
+                . $alternativo;
+        foreach ($adjuntos as $a) {
+            // Un salto de línea en el nombre o en el tipo partiría la cabecera
+            // en dos y permitiría inyectar lo que sea en el mensaje.
+            $limpiar = fn($v) => str_replace(["\r", "\n", '"'], '', (string) $v);
+            $tipo = $limpiar($a['tipo'] ?? 'application/octet-stream');
+            $arch = $limpiar($a['nombre'] ?? 'adjunto');
+            $cuerpo .= "--$limMix\r\n"
+                     . "Content-Type: $tipo; name=\"$arch\"\r\n"
+                     . "Content-Transfer-Encoding: base64\r\n"
+                     . "Content-Disposition: attachment; filename=\"$arch\"\r\n\r\n"
+                     . chunk_split(base64_encode((string) ($a['datos'] ?? ''))) . "\r\n";
+        }
+        $cuerpo .= "--$limMix--\r\n";
+    } else {
+        $cabecera[] = "Content-Type: multipart/alternative; boundary=\"$limAlt\"";
+        $cuerpo = $alternativo;
     }
 
-    $mensaje = implode("\r\n", $cabecera) . "\r\n\r\n"
-             . "--$limite\r\n"
-             . "Content-Type: text/plain; charset=UTF-8\r\n"
-             . "Content-Transfer-Encoding: base64\r\n\r\n"
-             . chunk_split(base64_encode($cuerpo['texto'])) . "\r\n"
-             . "--$limite\r\n"
-             . "Content-Type: text/html; charset=UTF-8\r\n"
-             . "Content-Transfer-Encoding: base64\r\n\r\n"
-             . chunk_split(base64_encode($cuerpo['html'])) . "\r\n"
-             . "--$limite--\r\n";
+    $mensaje = implode("\r\n", $cabecera) . "\r\n\r\n" . $cuerpo;
 
     // Un punto solo al principio de una línea cierra el mensaje en SMTP:
     // hay que duplicarlo para que no corte el correo por la mitad.
     $mensaje = preg_replace('/^\./m', '..', $mensaje);
 
-    $destinos = array_filter([$para, $copia]);
+    $destinos = array_filter(array_merge($para, [$copia]));
     $sock = abrirSocket($host, $puerto, $errstr);
 
     if (!$sock) {
@@ -171,16 +226,18 @@ function enviarConfirmacion(array $datos): bool
     }
 
     try {
-        stream_set_timeout($sock, 10);
+        stream_set_timeout($sock, 20);
+        // Por consola no hay SERVER_NAME, y vacío el EHLO da error 501.
+        $saludo = getenv('SMTP_EHLO') ?: ($_SERVER['SERVER_NAME'] ?? '') ?: 'localhost';
         smtpCmd($sock, null, [220]);
-        smtpCmd($sock, 'EHLO ' . ($_SERVER['SERVER_NAME'] ?? 'localhost'), [250]);
+        smtpCmd($sock, "EHLO $saludo", [250]);
 
         if ($puerto !== 465) {
             smtpCmd($sock, 'STARTTLS', [220]);
             if (!stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
                 throw new RuntimeException('no se pudo activar TLS');
             }
-            smtpCmd($sock, 'EHLO ' . ($_SERVER['SERVER_NAME'] ?? 'localhost'), [250]);
+            smtpCmd($sock, "EHLO $saludo", [250]);
         }
 
         smtpCmd($sock, 'AUTH LOGIN', [334]);
@@ -201,6 +258,19 @@ function enviarConfirmacion(array $datos): bool
         @fclose($sock);
         return false;
     }
+}
+
+/** Mail de confirmación al titular que se acaba de inscribir. */
+function enviarConfirmacion(array $datos): bool
+{
+    $cuerpo = armarCuerpo($datos, getenv('SMTP_NOMBRE') ?: 'AEDA');
+
+    return enviarMail([
+        'para'   => $datos['email'],
+        'asunto' => 'Inscripción confirmada — Día de la Niñez',
+        'texto'  => $cuerpo['texto'],
+        'html'   => $cuerpo['html'],
+    ]);
 }
 
 /** Arma las dos versiones del mensaje: texto plano y HTML. */

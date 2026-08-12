@@ -40,4 +40,10 @@ return [
     'SMTP_DESDE'    => '',            // por defecto, igual que SMTP_USER
     'SMTP_NOMBRE'   => 'AEDA',
     'SMTP_COPIA'    => '',            // copia oculta al organizador
+
+    // ── Reporte diario (reporte.php) ────────────────────────────────────
+    // A quién se le manda la planilla. Varias direcciones, separadas por
+    // coma. Vacío = no se manda nada.
+    'REPORTE_PARA'   => '',
+    'REPORTE_ASUNTO' => 'Inscripciones Día de la Niñez',
 ];
