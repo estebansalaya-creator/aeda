@@ -71,7 +71,7 @@ function fechaCorte(): string
     return getenv('FECHA_EVENTO') ?: '2026-09-19';
 }
 
-/** Edad tope, sin incluir: 16 significa "hasta 15 años cumplidos". */
+/** Edad tope, inclusive: 16 significa "hasta 16 años cumplidos". */
 function edadTope(): int
 {
     return (int) (getenv('EDAD_TOPE') ?: 16);

@@ -5,7 +5,8 @@
  * Son dos pasos en una sola página:
  *
  *   1. La persona ingresa el DNI del titular. Se busca en `padron` y se
- *      cuentan sus hijos menores de la edad tope a la fecha del evento.
+ *      cuentan sus hijos de hasta la edad tope (inclusive) a la fecha
+ *      del evento.
  *   2. Si tiene al menos uno, se muestra el formulario con los datos ya
  *      cargados desde el padrón para que sólo confirme o corrija.
  *
@@ -67,7 +68,7 @@ function buscarFamilia(PDO $pdo, string $dni): array
             WHERE  cuil_titular = :cuil
               AND  fecha_nacimiento IS NOT NULL
               AND  (parentesco LIKE 'Hijo%' OR parentesco LIKE 'Menor bajo guarda%')
-            HAVING edad < :tope
+            HAVING edad <= :tope
             ORDER  BY edad";
     $st = $pdo->prepare($sql);
     $st->execute([
@@ -97,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ? 'Ese documento figura como familiar. Ingresá el del titular: ' . $otroTitular . '.'
                         : 'No encontramos ese documento en el padrón.';
                 } elseif (!$ninos) {
-                    $error = 'El evento es para menores de ' . edadTope()
-                           . ' años y no figuran chicos de esa edad en tu grupo familiar.';
+                    $error = 'El evento es para chicos de hasta ' . edadTope()
+                           . ' años inclusive y no figuran chicos de esa edad en tu grupo familiar.';
                 } else {
                     $paso = 'form';
                     $form['ninos']    = count($ninos);
@@ -352,7 +353,7 @@ function fechaEnPalabras(): string
                  placeholder="Sin puntos" autofocus required>
           <div class="ayuda">
             Buscamos tu grupo familiar en el padrón. El evento es para
-            menores de <?= edadTope() ?> años.
+            chicos de hasta <?= edadTope() ?> años inclusive.
           </div>
         </div>
         <button class="btn" type="submit">Continuar</button>
